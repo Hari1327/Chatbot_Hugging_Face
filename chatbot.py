@@ -1,13 +1,12 @@
 import streamlit as st
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
 import torch
-
 # Load the pre-trained model and tokenizer
 @st.cache_resource
 def load_model():
-    model_name = "microsoft/DialoGPT-medium"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(model_name)
+    model_name = "facebook/blenderbot-400M-distill"
+    tokenizer = BlenderbotTokenizer.from_pretrained(model_name)
+    model = BlenderbotForConditionalGeneration.from_pretrained(model_name)
     return model, tokenizer
 
 model, tokenizer = load_model()
