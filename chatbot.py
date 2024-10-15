@@ -8,8 +8,9 @@ model_name = "facebook/blenderbot-400M-distill"
 tokenizer = BlenderbotTokenizer.from_pretrained(model_name)
 model = BlenderbotForConditionalGeneration.from_pretrained(model_name)
 
-# Load sentiment analysis model
-sentiment_analyzer = pipeline("sentiment-analysis")
+# Load sentiment analysis model (explicitly specifying the model)
+sentiment_model_name = "distilbert-base-uncased-finetuned-sst-2-english"
+sentiment_analyzer = pipeline("sentiment-analysis", model=sentiment_model_name)
 
 # Function to get weather information
 def get_weather(city):
