@@ -2,7 +2,7 @@ import streamlit as st
 import openai
 
 # Set your OpenAI API key
-openai.api_key = 'YOUR_API_KEY'
+openai.api_key = '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'
 
 # Function to interact with the GPT model
 def chat_with_gpt(prompt):
