@@ -1,49 +1,67 @@
 import streamlit as st
-from transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
-import torch
-# Load the pre-trained model and tokenizer
-@st.cache_resource
-def load_model():
-    model_name = "facebook/blenderbot-400M-distill"
-    tokenizer = BlenderbotTokenizer.from_pretrained(model_name)
-    model = BlenderbotForConditionalGeneration.from_pretrained(model_name)
-    return model, tokenizer
+from transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration, pipeline
+import requests
+import uuid
 
-model, tokenizer = load_model()
+# Load BlenderBot model and tokenizer
+model_name = "facebook/blenderbot-400M-distill"
+tokenizer = BlenderbotTokenizer.from_pretrained(model_name)
+model = BlenderbotForConditionalGeneration.from_pretrained(model_name)
 
-# Title of the web app
-st.title("🤖 Chatbot using Hugging Face")
+# Load sentiment analysis model
+sentiment_analyzer = pipeline("sentiment-analysis")
 
-# Description
-st.write("This is a simple chatbot application using the `DialoGPT` model from Hugging Face. Type a message to start a conversation!")
+# Function to get weather information
+def get_weather(city):
+    api_key = "your_openweather_api_key"  # Replace with your OpenWeather API key
+    base_url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+    response = requests.get(base_url)
+    data = response.json()
+    if data["cod"] != "404":
+        weather = data["main"]
+        return f"The temperature in {city} is {weather['temp']}°C with {data['weather'][0]['description']}."
+    else:
+        return "City not found."
 
-# Initialize session state for chat history
-if "chat_history_ids" not in st.session_state:
-    st.session_state["chat_history_ids"] = None
-if "past_inputs" not in st.session_state:
-    st.session_state["past_inputs"] = []
+# Streamlit app setup
+st.title("Advanced Chatbot")
+st.write("This chatbot can have a basic conversation, provide weather information, and analyze sentiment!")
 
-# User input text box
-user_input = st.text_input("You: ", "")
+# Initialize user session
+if "user_id" not in st.session_state:
+    st.session_state["user_id"] = uuid.uuid4()
 
-# Generate response when user submits a message
-if user_input:
-    # Tokenize input and append EOS token
-    new_input_ids = tokenizer.encode(user_input + tokenizer.eos_token, return_tensors="pt")
+if "chat_history" not in st.session_state:
+    st.session_state["chat_history"] = ""
 
-    # Combine new input with chat history
-    bot_input_ids = torch.cat([st.session_state["chat_history_ids"], new_input_ids], dim=-1) if st.session_state["chat_history_ids"] is not None else new_input_ids
+# User input
+user_input = st.text_input("You:", "")
 
-    # Generate the bot's response
-    st.session_state["chat_history_ids"] = model.generate(bot_input_ids, max_length=1000, pad_token_id=tokenizer.eos_token_id)
+if st.button("Send"):
+    if user_input:
+        # Store user input in chat history
+        st.session_state["chat_history"] += f"You: {user_input}\n"
 
-    # Decode the response
-    response = tokenizer.decode(st.session_state["chat_history_ids"][:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True)
+        # Analyze sentiment
+        sentiment = sentiment_analyzer(user_input)[0]
+        st.write(f"Sentiment: {sentiment['label']} with score {sentiment['score']:.2f}")
 
-    # Store the input and response
-    st.session_state["past_inputs"].append((user_input, response))
+        # Check for weather intent
+        if "weather" in user_input.lower():
+            city = user_input.split("in ")[-1]
+            weather_info = get_weather(city)
+            response = weather_info
+        else:
+            # Generate response using BlenderBot
+            input_ids = tokenizer.encode(st.session_state["chat_history"] + tokenizer.eos_token, return_tensors="pt")
+            output = model.generate(input_ids, max_length=1000, pad_token_id=tokenizer.eos_token_id)
+            response = tokenizer.decode(output[:, input_ids.shape[-1]:][0], skip_special_tokens=True)
 
-# Display chat history
-for user, bot in st.session_state["past_inputs"]:
-    st.write(f"You: {user}")
-    st.write(f"Chatbot: {bot}")
+        # Store response in chat history
+        st.session_state["chat_history"] += f"Bot: {response}\n"
+        
+        # Display conversation history
+        st.write(f"**Chatbot:** {response}")
+
+# Show chat history
+st.text_area("Chat History", value=st.session_state["chat_history"], height=300)
