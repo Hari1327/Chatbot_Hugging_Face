@@ -1,43 +1,72 @@
+import os
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from langchain.llms import HuggingFaceHub
+from langchain import PromptTemplate, LLMChain
 import streamlit as st
-import openai
+import re  # Import regex module to help clean the text
 
-# Set your OpenAI API key
-openai.api_key = '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'
+# Hugging Face API token
+api_token = "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"
 
-# Function to interact with the GPT model
-def chat_with_gpt(prompt):
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",  # You can use "gpt-4" if you have access
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
-    )
-    return response['choices'][0]['message']['content']
+# Hugging Face model repo_id
+repo_id = "HuggingFaceH4/starchat-beta"
 
-# Streamlit UI
-st.title("Chatbot using GPT")
+# Initialize Hugging Face model
+llm = HuggingFaceHub(
+    repo_id=repo_id,
+    huggingfacehub_api_token=api_token,
+    model_kwargs={
+        "min_length": 30,
+        "max_new_tokens": 256,
+        "do_sample": True,
+        "temperature": 0.2,
+        "top_k": 50,
+        "top_p": 0.95,
+        "eos_token_id": 49155
+    }
+)
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# Define the prompt template
+prompt = PromptTemplate(template="{myprompt}", input_variables=["myprompt"])
 
-# Input box for user message
+# Set up the LangChain LLM chain
+llm_chain = LLMChain(prompt=prompt, llm=llm)
+
+# Streamlit app
+st.title("AI Assistant")
+
+# Initialize chat history
+if "chat_history" not in st.session_state:
+    st.session_state["chat_history"] = []
+
+# User input field
 user_input = st.text_input("You:", "")
 
+# Define a cleaning function for the model's output
+def clean_response(response):
+    # Remove any unwanted tokens or characters using regex
+    response = re.sub(r'(<\|end\|>|<.*?>)', '', response)  # Remove <|end|> and similar patterns
+    response = response.strip()  # Strip any leading or trailing whitespace
+    return response
+
+# When the user presses "Send"
 if st.button("Send"):
     if user_input:
-        # Store user message
-        st.session_state.messages.append({"role": "user", "content": user_input})
+        # Add the user's input to the chat history
+        # st.session_state.chat_history.append(f"You: {user_input}")
         
-        # Get GPT response
-        gpt_response = chat_with_gpt(user_input)
+        # Generate the response using the LLM
+        llm_reply = llm_chain.run(myprompt=user_input)
         
-        # Store GPT response
-        st.session_state.messages.append({"role": "assistant", "content": gpt_response})
+        # Clean the response by removing unwanted tokens
+        reply = clean_response(llm_reply)
+        
+        # Add the model's response to the chat history
+        st.session_state.chat_history.append(f"AI: {reply}")
+        
+        # Clear the input box after sending
+        user_input = ""
 
-# Display chat messages
-if st.session_state.messages:
-    for message in st.session_state.messages:
-        if message["role"] == "user":
-            st.markdown(f"**You:** {message['content']}")
-        else:
-            st.markdown(f"**Chatbot:** {message['content']}")
+# Display the chat history
+for message in st.session_state.chat_history:
+    st.text_area("", message, height=100, key=message)
