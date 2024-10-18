@@ -6,7 +6,7 @@ import streamlit as st
 import re  # Import regex module to help clean the text
 
 # Hugging Face API token
-api_token = "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"
+api_token = st.secrets["HUGGINGFACEHUB_API_TOKEN"]
 
 # Hugging Face model repo_id
 repo_id = "HuggingFaceH4/starchat-beta"
